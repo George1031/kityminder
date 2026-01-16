@@ -1,41 +1,50 @@
-#完全不需要写仓库名
-#✅ 自动就是“当前这个项目”
-#✅ 永远拿最新 Release
-
-
-
-name: Get My Repo Latest Release
+name: Get Latest Release Or Tag
 
 on:
   workflow_dispatch:
 
 jobs:
-  get-release:
+  get-version:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
-      - name: Install GitHub CLI
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gh jq
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y jq
 
-      - name: Download latest release of this repo
+      - name: Detect latest Release or Tag
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "Current repo: $GITHUB_REPOSITORY"
 
-          release_info=$(gh api repos/$GITHUB_REPOSITORY/releases/latest)
-          tag_name=$(echo "$release_info" | jq -r .tag_name)
+          # 1️⃣ 尝试获取最新 Release
+          release_json=$(curl -s -o release.json -w "%{http_code}" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            https://api.github.com/repos/$GITHUB_REPOSITORY/releases/latest)
 
-          echo "Latest tag: $tag_name"
+          if [ "$release_json" = "200" ]; then
+            echo "✅ Release found"
+            tag_name=$(jq -r '.tag_name' release.json)
+            source="release"
+          else
+            echo "⚠️ No Release found, fallback to tag"
 
-          mkdir release-assets
-          cd release-assets
+            tag_name=$(curl -s \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              https://api.github.com/repos/$GITHUB_REPOSITORY/tags \
+              | jq -r '.[0].name')
 
-          echo "$release_info" \
-            | jq -r '.assets[].browser_download_url' \
-            | while read url; do
-                echo "Downloading $url"
-                wget -q "$url"
-              done
+            if [ "$tag_name" = "null" ] || [ -z "$tag_name" ]; then
+              echo "❌ No tag found"
+              exit 1
+            fi
+
+            source="tag"
+          fi
+
+          echo "----------------------------"
+          echo "Version source : $source"
+          echo "Version tag    : $tag_name"
+          echo "----------------------------"
