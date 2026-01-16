@@ -1,45 +1,41 @@
-name: Sync Releases from Upstream
+#完全不需要写仓库名
+#✅ 自动就是“当前这个项目”
+#✅ 永远拿最新 Release
+
+
+
+name: Get My Repo Latest Release
 
 on:
-  workflow_dispatch:   # 可以手动触发
-  #schedule:
-   # - cron: "0 3 * * *"   # 每天凌晨 3 点自动执行（UTC 时间）
+  workflow_dispatch:
 
 jobs:
-  sync:
+  get-release:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
       - name: Install GitHub CLI
         run: |
           sudo apt-get update
           sudo apt-get install -y gh jq
 
-      - name: Download latest release from upstream
+      - name: Download latest release of this repo
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          UPSTREAM_OWNER="twbs"
-          UPSTREAM_REPO="bootstrap"
+          echo "Current repo: $GITHUB_REPOSITORY"
 
-          # 获取最新 release ID
-          release_info=$(gh api repos/$UPSTREAM_OWNER/$UPSTREAM_REPO/releases/latest)
-
+          release_info=$(gh api repos/$GITHUB_REPOSITORY/releases/latest)
           tag_name=$(echo "$release_info" | jq -r .tag_name)
-          assets=$(echo "$release_info" | jq -r '.assets[].browser_download_url')
+
+          echo "Latest tag: $tag_name"
 
           mkdir release-assets
           cd release-assets
 
-          echo "Downloading assets for release $tag_name ..."
-          for url in $assets; do
-            wget -q $url
-          done
-
-          cd ..
-
-          echo "Creating release $tag_name in current repo ..."
-          gh release create "$tag_name" release-assets/* --repo $GITHUB_REPOSITORY --title "$tag_name" --notes "Synced from upstream"
+          echo "$release_info" \
+            | jq -r '.assets[].browser_download_url' \
+            | while read url; do
+                echo "Downloading $url"
+                wget -q "$url"
+              done
