@@ -1,0 +1,45 @@
+name: Sync Releases from Upstream
+
+on:
+  workflow_dispatch:   # 可以手动触发
+  schedule:
+   # - cron: "0 3 * * *"   # 每天凌晨 3 点自动执行（UTC 时间）
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install GitHub CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gh jq
+
+      - name: Download latest release from upstream
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          UPSTREAM_OWNER="twbs"
+          UPSTREAM_REPO="bootstrap"
+
+          # 获取最新 release ID
+          release_info=$(gh api repos/$UPSTREAM_OWNER/$UPSTREAM_REPO/releases/latest)
+
+          tag_name=$(echo "$release_info" | jq -r .tag_name)
+          assets=$(echo "$release_info" | jq -r '.assets[].browser_download_url')
+
+          mkdir release-assets
+          cd release-assets
+
+          echo "Downloading assets for release $tag_name ..."
+          for url in $assets; do
+            wget -q $url
+          done
+
+          cd ..
+
+          echo "Creating release $tag_name in current repo ..."
+          gh release create "$tag_name" release-assets/* --repo $GITHUB_REPOSITORY --title "$tag_name" --notes "Synced from upstream"
