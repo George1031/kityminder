@@ -1,50 +1,39 @@
-name: Get Latest Release Or Tag
+name: Auto Release with Assets
 
 on:
-  workflow_dispatch:
+  push:
+    tags:
+      - "v*"   # 只要 push v 开头的 tag 就触发
 
 jobs:
-  get-version:
+  release:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
 
     steps:
-      - name: Install tools
-        run: sudo apt-get update && sudo apt-get install -y jq
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Detect latest Release or Tag
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Prepare version info
+        id: vars
         run: |
-          echo "Current repo: $GITHUB_REPOSITORY"
+          TAG_NAME="${GITHUB_REF##*/}"
+          echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "Release tag: $TAG_NAME"
 
-          # 1️⃣ 尝试获取最新 Release
-          release_json=$(curl -s -o release.json -w "%{http_code}" \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            https://api.github.com/repos/$GITHUB_REPOSITORY/releases/latest)
+      - name: Build release assets
+        run: |
+          mkdir dist
+          zip -r dist/kityminder-${{ steps.vars.outputs.tag }}.zip . \
+            -x ".git/*" ".github/*"
 
-          if [ "$release_json" = "200" ]; then
-            echo "✅ Release found"
-            tag_name=$(jq -r '.tag_name' release.json)
-            source="release"
-          else
-            echo "⚠️ No Release found, fallback to tag"
-
-            tag_name=$(curl -s \
-              -H "Authorization: Bearer $GH_TOKEN" \
-              https://api.github.com/repos/$GITHUB_REPOSITORY/tags \
-              | jq -r '.[0].name')
-
-            if [ "$tag_name" = "null" ] || [ -z "$tag_name" ]; then
-              echo "❌ No tag found"
-              exit 1
-            fi
-
-            source="tag"
-          fi
-
-          echo "----------------------------"
-          echo "Version source : $source"
-          echo "Version tag    : $tag_name"
-          echo "----------------------------"
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.vars.outputs.tag }}
+          name: Release ${{ steps.vars.outputs.tag }}
+          body: |
+            🚀 Automated release for tag `${{ steps.vars.outputs.tag }}`
+          files: |
+            dist/*.zip
