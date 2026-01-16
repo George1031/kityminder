@@ -2,7 +2,7 @@ name: Sync Releases from Upstream
 
 on:
   workflow_dispatch:   # 可以手动触发
-  schedule:
+  #schedule:
    # - cron: "0 3 * * *"   # 每天凌晨 3 点自动执行（UTC 时间）
 
 jobs:
