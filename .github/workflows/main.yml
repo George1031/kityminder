@@ -22,8 +22,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          UPSTREAM_OWNER="twbs"
-          UPSTREAM_REPO="bootstrap"
+          UPSTREAM_OWNER="fex-team"
+          UPSTREAM_REPO="kityminder"
 
           # 获取最新 release ID
           release_info=$(gh api repos/$UPSTREAM_OWNER/$UPSTREAM_REPO/releases/latest)
