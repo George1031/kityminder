@@ -21,8 +21,9 @@ jobs:
       - name: Download latest release from upstream
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          #这里要改成fork那个仓库
         run: |
-          UPSTREAM_OWNER="fex-team"
+          UPSTREAM_OWNER="fex-team" 
           UPSTREAM_REPO="kityminder"
 
           # 获取最新 release ID
